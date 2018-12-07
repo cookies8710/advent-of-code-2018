@@ -1,6 +1,4 @@
 import java.nio.file.{Files, Paths}
-import java.util.regex.Pattern
-
 import scala.collection.JavaConverters._
 
 object Main extends App {
@@ -9,13 +7,8 @@ object Main extends App {
   case class Dependency(start: Char, end: Char)
 
   object Dependency {
-    val pattern = Pattern.compile("Step (.) must be finished before step (.) can begin.")
-
-    def apply(string: String): Dependency = {
-      val matcher = pattern.matcher(string)
-      assert(matcher.matches())
-      Dependency(matcher.group(1).head, matcher.group(2).head)
-    }
+    val pattern = "Step (.) must be finished before step (.) can begin.".r
+    def apply(string: String): Dependency = string match { case pattern(start, end) => Dependency(start.head, end.head) }
   }
 
   val testLines = List(

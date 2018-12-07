@@ -1,6 +1,4 @@
 import java.nio.file.{Files, Paths}
-import java.util.regex.Pattern
-
 import scala.collection.JavaConverters._
 
 object Main extends App {
@@ -19,12 +17,8 @@ object Main extends App {
   }
   object Coords
   {
-    val pattern = Pattern.compile("(\\d+),\\s+(\\d+)")
-    def apply(s: String): Coords = {
-      val m = pattern.matcher(s)
-      assert(m.matches())
-      Coords(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)))
-    }
+    val pattern = "(\\d+),\\s+(\\d+)".r
+    def apply(s: String): Coords = s match { case pattern(x, y) => Coords(Integer.parseInt(x), Integer.parseInt(y)) }
   }
 
   val input = lines

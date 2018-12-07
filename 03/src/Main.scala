@@ -1,5 +1,4 @@
-import java.nio.file.{Files, Path, Paths}
-import java.util.regex.Pattern
+import java.nio.file.{Files, Paths}
 
 import scala.collection.JavaConverters._
 
@@ -22,13 +21,17 @@ object Main extends App {
 
   object Claim
   {
-    val pattern = Pattern.compile("#(\\d+) @ (\\d+),(\\d+): (\\d+)x(\\d+)$")
+    val pattern = "#(\\d+) @ (\\d+),(\\d+): (\\d+)x(\\d+)$".r
     def apply(s: String): Option[Claim] = {
-      val m = pattern.matcher(s)
-      if (m.matches())
-        Some(Claim(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)), Integer.parseInt(m.group(5))))
-      else
-        None
+      s match {
+        case pattern(claim, x, y, w, h) => Some(Claim(
+          Integer.parseInt(claim),
+          Integer.parseInt(x),
+          Integer.parseInt(y),
+          Integer.parseInt(w),
+          Integer.parseInt(h)))
+        case _ => None
+      }
     }
   }
 

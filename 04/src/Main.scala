@@ -1,6 +1,5 @@
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 import java.time.{Duration, LocalDateTime}
-import java.util.regex.Pattern
 
 import scala.collection.JavaConverters._
 
@@ -16,25 +15,23 @@ object Main extends App {
 
   object Event
   {
-    val pattern = Pattern.compile("\\[([^\\]]+)\\]\\s(.*)$")
-    val beginShiftPattern = Pattern.compile("Guard #(\\d+) begins shift")
-    def parse(s: String): Event = {
-      val m = pattern.matcher(s)
-      assert(m.matches())
-      val time = LocalDateTime.parse(m.group(1).replace(' ', 'T'))
-      val (event, id) = m.group(2) match {
-        case "falls asleep" => (FallsAsleep, None)
-        case "wakes up" => (WakesUp, None)
-        case _ => {
-          val mm = beginShiftPattern.matcher(m.group(2))
-          assert(mm.matches())
-          val id: Int = Integer.parseInt(mm.group(1))
-          (BeginShift, Some(id))
-        }
+    val pattern = "\\[([^\\]]+)\\]\\s(.*)$".r
+    val beginShiftPattern = "Guard #(\\d+) begins shift".r
+    def parse(s: String): Event =
+      s match {
+        case pattern(timeStr, eventStr) =>
+          val time = LocalDateTime.parse(timeStr.replace(' ', 'T'))
+          val (event, id) = eventStr match {
+            case "falls asleep" => (FallsAsleep, None)
+            case "wakes up" => (WakesUp, None)
+            case _ => eventStr match {
+              case beginShiftPattern(idStr) => (BeginShift, Some(Integer.parseInt(idStr)))
+            }
+          }
+          Event(time, id, event)
       }
-      Event(time, id, event)
-     }
   }
+
 
 
 
