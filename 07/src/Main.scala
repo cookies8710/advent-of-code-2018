@@ -6,15 +6,15 @@ import scala.collection.JavaConverters._
 object Main extends App {
   val lines = Files.readAllLines(Paths.get("input")).asScala
 
-  case class Dependency(a: Char, b: Char)
+  case class Dependency(start: Char, end: Char)
 
   object Dependency {
     val pattern = Pattern.compile("Step (.) must be finished before step (.) can begin.")
 
-    def apply(s: String): Dependency = {
-      val m = pattern.matcher(s)
-      assert(m.matches())
-      Dependency(m.group(1).head, m.group(2).head)
+    def apply(string: String): Dependency = {
+      val matcher = pattern.matcher(string)
+      assert(matcher.matches())
+      Dependency(matcher.group(1).head, matcher.group(2).head)
     }
   }
 
@@ -27,66 +27,62 @@ object Main extends App {
     "Step D must be finished before step E can begin.",
     "Step F must be finished before step E can begin.")
 
-  val input = lines
-  val limit = 5 // 2 for test lines
-  val baseLineDuration = 60 // 0 for test lines
+  //val (input, workers, baseDuration) = (testLines, 2, 0)
+  val (input, workers, baseDuration) = (lines, 5, 60)
+  val dependencies = input.map(Dependency.apply).toStream
 
-  val deps = input.map(Dependency.apply).toStream
-
-  def canProceed(done: String, d: Stream[Dependency])(c: Char): Boolean = {
-    assert(!done.contains(c))
-    d.filter(_.b == c)
-      .map(_.a)
+  def canProceed(done: String, dependencies: Stream[Dependency])(step: Char): Boolean = {
+    assert(!done.contains(step))
+    dependencies.filter(_.end == step)
+      .map(_.start)
       .forall(x => done.contains(x.toString))
   }
 
-  def step(done: String, todo: Stream[Char], d: Stream[Dependency]): (String, Stream[Char]) = {
-    val cand = todo.filter(canProceed(done, d))
-    assert(cand.nonEmpty)
+  def step(done: String, notDone: Stream[Char], dependencies: Stream[Dependency]): (String, Stream[Char]) = {
+    val candidates = notDone.filter(canProceed(done, dependencies))
+    assert(candidates.nonEmpty)
 
-    val next = cand.sorted.head
-    (done + next, todo.filter(_ != next))
+    val next = candidates.sorted.head
+    (done + next, notDone.filter(_ != next))
   }
 
   def construct(dps: Stream[Dependency]): String = {
-    val steps = dps.flatMap(d => List(d.a, d.b)).distinct
+    val steps = dps.flatMap(d => List(d.start, d.end)).distinct
 
     Stream.iterate("" -> steps)(x => step(x._1, x._2, dps)).find(_._2.isEmpty).get._1
   }
 
-  // println(construct(deps))
+  val result1 = construct(dependencies)
+  println(s"result 1 : $result1")
 
-  case class Progress(c: Char, dur: Int) {
-    def inced: Progress = Progress(c, dur + 1)
-    def done: Boolean = (baseLineDuration + 1 + c.toInt - 'A'.toInt) <= dur
+  case class Progress(step: Char, duration: Int) {
+    def inced: Progress = Progress(step, duration + 1)
+    def done: Boolean = (baseDuration + 1 + step.toInt - 'A'.toInt) <= duration
   }
 
   object Progress
   {
-    def apply(c: Char): Progress = Progress(c, 0)
+    def apply(step: Char): Progress = Progress(step, 0)
   }
 
-  def timedconstructstep(limit: Int)(done: String, todo: Stream[Char], progress: Set[Progress], time: Int, dps: Stream[Dependency]): (String, Stream[Char], Set[Progress], Int) = {
-    println(s"#$time\tdone: $done, todo: ${todo.toList}, progress: $progress")
-    assert(progress.size <= limit)
-    val (finished, cnt) = progress.map(_.inced).partition(_.done)
+  def stepTimed(workers: Int)(done: String, notDone: Stream[Char], progress: Set[Progress], time: Int, dependencies: Stream[Dependency]): (String, Stream[Char], Set[Progress], Int) = {
+    assert(progress.size <= workers)
+    val (finished, continuing) = progress.map(_.inced).partition(_.done)
 
-    val done2 = done + new String(finished.map(_.c).toStream.sorted.toArray)
+    val newDone = done + new String(finished.map(_.step).toStream.sorted.toArray)
 
-    val (candidates, todocarry) = todo.partition(canProceed(done2, dps))
-    val (newprog, newtodo) = candidates.sorted.splitAt(limit - cnt.size)
+    val (candidates, notDoneCarry) = notDone.partition(canProceed(newDone, dependencies))
+    val (newProgress, newNotDone) = candidates.sorted.splitAt(workers - continuing.size)
 
-    (done2, todocarry ++ newtodo, cnt ++ newprog.map(Progress.apply), time + 1)
+    (newDone, notDoneCarry ++ newNotDone, continuing ++ newProgress.map(Progress.apply), time + 1)
   }
 
-  def constructTimed(limit: Int, dps: Stream[Dependency]): String = {
-    val steps = dps.flatMap(d => List(d.a, d.b)).distinct.sorted
-    var done = ""
-
-    Stream.iterate(("", steps, Set[Progress](), 0))(tr => timedconstructstep(limit)(tr._1, tr._2, tr._3, tr._4, dps)).find(tr => tr._2.isEmpty && tr._3.isEmpty).get._1
+  def constructTimed(workers: Int, dependencies: Stream[Dependency]): Int = {
+    val steps = dependencies.flatMap(d => List(d.start, d.end)).distinct.sorted
+    Stream.iterate(("", steps, Set[Progress](), 0))(tr => stepTimed(workers)(tr._1, tr._2, tr._3, tr._4, dependencies)).find(tr => tr._2.isEmpty && tr._3.isEmpty).get._4 - 1
   }
 
-  val result2 = constructTimed(limit, deps)
+  val result2 = constructTimed(workers, dependencies)
   println(s"result 2 : $result2")
 
 }
