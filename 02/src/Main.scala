@@ -36,8 +36,8 @@ object Main extends App {
   def near(s1: String, s2: String): Boolean = near(s1, s2, 1)
 
   val nl = lines.length
-  for (i <- Stream.range(0, nl);
-       j <- Stream.range(i + 1, nl))
+  for (i <- 0 until nl;
+       j <- i + 1 until nl)
   {
     if (near(lines(i), lines(j)))
       println(s"${lines(i)}\n${lines(j)}")

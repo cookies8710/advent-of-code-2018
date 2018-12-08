@@ -39,8 +39,8 @@ object Main extends App {
     .map(Claim.apply)
   val max = (lines.map(t => t.get.x + t.get.w).max, lines.map(t => t.get.y + t.get.h).max)
   var c = 0
-  for(i <- Stream.range(0, max._1 + 1);
-      j <- Stream.range(0, max._1 + 1))
+  for(i <- 0 to max._1;
+      j <- 0 to max._1)
   {
     val m =lines.filter(_.get.hasPoint(i, j)).take(2).toList
     if (m.length == 2)c = c + 1

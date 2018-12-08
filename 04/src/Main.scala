@@ -119,7 +119,7 @@ object Main extends App {
     * @param s
     * @return (Minute, # of times asleep)
     */
-  def minSleepOcc(s: Stream[Sleep]): (Int, Int) = Stream.range(0, 60).map(m => (m, s.count(_.hasMin(m)))).maxBy(_._2)
+  def minSleepOcc(s: Stream[Sleep]): (Int, Int) = (0 until 60).map(m => (m, s.count(_.hasMin(m)))).maxBy(_._2)
 
   // chronologicaly sorted event grouped by ID
   val byId = filled.groupBy(_.id)

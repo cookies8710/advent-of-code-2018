@@ -25,8 +25,8 @@ object Main extends App {
   val inputCoordinates = input.map(Coords.apply).toStream
 
   def getAreas(coords: Stream[Coords], ld: Coords, ru: Coords): Map[Int, Int] = {
-    var areas: Map[Int, Int] = Stream.range(0, coords.length).map(_ -> 0).toMap
-    for (x <- Stream.range(ld.x, ru.x + 1); y <- Stream.range(ld.y, ru.y + 1))
+    var areas: Map[Int, Int] = coords.indices.map(_ -> 0).toMap
+    for (x <- ld.x to ru.x; y <- ld.y to ru.y)
     {
       val dists = coords.zipWithIndex.map(c => (c._2, c._1.dist(Coords(x, y))))
       val min = dists.map(_._2).min
@@ -47,7 +47,7 @@ object Main extends App {
     val (l, r) = (xs.min, xs.max)
     val (u, d) = (ys.max, ys.min)
 
-    val indexes = Stream.range(0, coords.length)
+    val indexes = coords.indices
 
     val a1 = getAreas(coords, Coords(l, d), Coords(r, u))
     val a2 = getAreas(coords, Coords(l - 1, d - 1), Coords(r + 1, u + 1))
@@ -70,7 +70,7 @@ object Main extends App {
     val (u, d) = (ys.max, ys.min)
 
     var regionArea = 0
-    for (x <- Stream.range(l, r + 1); y <- Stream.range(d, u + 1))
+    for (x <- l to r; y <- d to u)
       {
        val loc = Coords(x, y)
         if (safeLocation(loc, coords)) regionArea = regionArea + 1
