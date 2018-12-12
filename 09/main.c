@@ -35,11 +35,6 @@ Node *jump(Node* current, int delta)
         return jump(current->prev, delta + 1);
 }
 
-void inc(int player, int value)
-{
-    //printf("Player %d += %d\n", player, value);
-    scores[player] += value;
-}
 // Will insert a new node accordingly
 // Returns new current node
 Node *insert(Node *current, int player, int value)
@@ -51,9 +46,9 @@ Node *insert(Node *current, int player, int value)
         return new;
     }
     
+    Node *a, *b;
     if (value % 23)
     {
-        Node *a, *b;
         a = jump(current, 1);
         b = jump(a, 1);
 
@@ -66,11 +61,10 @@ Node *insert(Node *current, int player, int value)
     }
     else
     {
-        inc(player, value);
+        scores[player] += value;
         Node* rm = jump(current, -7);
-        inc(player, rm->value);
+        scores[player] += rm->value;
 
-        Node *a, *b;
         a = jump(rm, -1);
         b = jump(rm, 1);
         a->next = b;
@@ -95,6 +89,22 @@ void printChain(Node* current)
     printf("\n");
 }
 
+void cleanup(Node** current)
+{
+    (*current)->prev->next = NULL;
+    Node *rm = *current;
+    Node *ptr = *current;
+    
+    while (ptr)
+    {
+	rm = ptr;
+	ptr = ptr->next;
+	free(rm);
+    }
+
+    *current = NULL;
+}
+
 int main(void) 
 {
     printf("Starting\n");
@@ -104,11 +114,9 @@ int main(void)
 
     Node *current = NULL;
     for(int i = 0; i <= LAST; i++)
-    {
         current = insert(current, i % PLAYERS, i);
-    }
 
-    //printChain(current);
+    cleanup(&current);
 
     long max = 0;
     for(int i = 0; i < PLAYERS; i++)
