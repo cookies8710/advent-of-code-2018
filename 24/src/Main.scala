@@ -27,17 +27,19 @@ object Main extends App {
   case class Group(id: GroupId, numberOfUnits: Int, hitPointsPerUnit: Int, immunities: Set[DamageType], weaknesses: Set[DamageType], attackDamage: Int, attackDamageType: DamageType, initiative: Int)
   {
     override def toString: String = s"Group $id with $numberOfUnits units"
-    val boostedDamage = if (id.side == Imm) attackDamage + 36 else attackDamage // immune system wins with 5252 units left
+    val boostedDamage = if (id.side == ImmuneSystem) attackDamage + 36 else attackDamage // immune system wins with 5252 units left
     def effectivePower: Int = numberOfUnits * boostedDamage
     def attackPotential(defender: Group): Int = {
-      val mul = if (defender.immunities.contains(attackDamageType)) 0 else if (defender.weaknesses.contains(attackDamageType)) 2 else 1
-      mul * effectivePower
+      val multiplier = if (defender.immunities.contains(attackDamageType)) 0
+      else if (defender.weaknesses.contains(attackDamageType)) 2
+      else 1
+      multiplier * effectivePower
     }
     def afterAttackby(attacker: Group): Option[Group] = {
       val casualities = attacker.attackPotential(this) / hitPointsPerUnit
-      val nu = numberOfUnits - casualities
-      if (nu > 0)
-        Some(Group(id, nu, hitPointsPerUnit, immunities, weaknesses, attackDamage, attackDamageType, initiative))
+      val newNumberOfUnits = numberOfUnits - casualities
+      if (newNumberOfUnits > 0)
+        Some(Group(id, newNumberOfUnits, hitPointsPerUnit, immunities, weaknesses, attackDamage, attackDamageType, initiative))
       else
         None
     }
@@ -45,27 +47,27 @@ object Main extends App {
 
   object Group
   {
-    val NoModifiersPattern = "(\\d+) units each with (\\d+) hit points (\\([^\\)]+\\)) with an attack that does (\\d+) ([a-z]+) damage at initiative (\\d+)".r
-    val WithModifiersPattern = "(\\d+) units each with (\\d+) hit points with an attack that does (\\d+) ([a-z]+) damage at initiative (\\d+)".r
+    val WithModifiersPattern = "(\\d+) units each with (\\d+) hit points (\\([^\\)]+\\)) with an attack that does (\\d+) ([a-z]+) damage at initiative (\\d+)".r
+    val NoModifiersPattern = "(\\d+) units each with (\\d+) hit points with an attack that does (\\d+) ([a-z]+) damage at initiative (\\d+)".r
 
-    val wt = "weak to"
-    val it = "immune to"
+    val weakTo = "weak to"
+    val immuneTo = "immune to"
 
     def parse(line: String, id: GroupId): Group = {
       line match {
-        case WithModifiersPattern(numberOfUnits, hitPointsPerUnit, attackDamage, attackDamageType, initiative) =>
+        case NoModifiersPattern(numberOfUnits, hitPointsPerUnit, attackDamage, attackDamageType, initiative) =>
           Group(id, numberOfUnits.toInt,hitPointsPerUnit.toInt, Set.empty, Set.empty, attackDamage.toInt, DamageType.parse(attackDamageType), initiative.toInt)
-        case NoModifiersPattern(nu, hps, imw, attdmg, atttype, init) =>
-          var iset: Set[DamageType] = Set()
-          var wset: Set[DamageType] = Set()
-          for (iwg <- imw.split(";")) {
-            val koo = iwg.trim.filter(c => c != '(' && c != ')')
-            val imm = koo.startsWith(it)
-            val sanitized: String = if (koo.startsWith(wt)) koo.drop(wt.size) else if (koo.startsWith(it)) koo.drop(it.size) else ""
-            val tps = sanitized.split(",").map(_.trim).toList
-            if (imm) iset = tps.map(DamageType.parse).toSet else wset = tps.map(DamageType.parse).toSet
+        case WithModifiersPattern(numberOfUnits, hitPointsPerUnit, damageModifiers, attackDamage, attackDamageType, initiative) =>
+          var immunities: Set[DamageType] = Set()
+          var weakenesses: Set[DamageType] = Set()
+          for (damageModifiers <- damageModifiers.split(";")) {
+            val trimmed = damageModifiers.trim.filter(c => c != '(' && c != ')')
+            val isImmunity = trimmed.startsWith(immuneTo)
+            val sanitized: String = if (trimmed.startsWith(weakTo)) trimmed.drop(weakTo.size) else if (trimmed.startsWith(immuneTo)) trimmed.drop(immuneTo.size) else ""
+            val damageTypes = sanitized.split(",").map(_.trim).toList
+            if (isImmunity) immunities = damageTypes.map(DamageType.parse).toSet else weakenesses = damageTypes.map(DamageType.parse).toSet
           }
-          Group(id, nu.toInt,hps.toInt,iset, wset, attdmg.toInt,DamageType.parse(atttype), init.toInt)
+          Group(id, numberOfUnits.toInt,hitPointsPerUnit.toInt,immunities, weakenesses, attackDamage.toInt,DamageType.parse(attackDamageType), initiative.toInt)
       }
     }
   }
@@ -75,28 +77,27 @@ object Main extends App {
     def other: Side = ???
 
   }
-  object Noside extends Side
-  object Imm extends Side
+  object NoSide extends Side
+  object ImmuneSystem extends Side
   {
-    override def other: Side = Inf
+    override def other: Side = Infection
     override def toString: String = "Immune System"
   }
-  object Inf extends Side
+  object Infection extends Side
   {
-    override def other: Side = Imm
-
+    override def other: Side = ImmuneSystem
     override def toString: String = "Infection"
   }
-  var side: Side = Noside
+  var side: Side = NoSide
   var counter: Int = 0
   val input = realInput
   val initialGroups: Map[GroupId, Group] = input.flatMap {
     case "Immune System:" =>
-      side = Imm
+      side = ImmuneSystem
       counter = 0
       None
     case "Infection:" =>
-      side = Inf
+      side = Infection
       counter = 0
       None
     case s if s.trim.isEmpty =>
@@ -107,25 +108,25 @@ object Main extends App {
       Some(groupId -> Group.parse(grp, groupId))
   }.toMap
 
-  class State(val igrs: Map[GroupId, Group])
+  class State(val initialGroups: Map[GroupId, Group])
   {
-    val winningArmy: Option[Side] = igrs.map(_._1.side).toList.distinct match {
+    val winningArmy: Option[Side] = initialGroups.map(_._1.side).toList.distinct match {
       case List(winner) => Some(winner)
       case _ => None
     }
-    val fighting: Boolean = igrs.map(_._1.side).toSet.size > 1
+    val fighting: Boolean = initialGroups.map(_._1.side).toSet.size > 1
     def fight(): State = {
       // phase I : target selection
       println("Phase I - target selection")
       var targets: List[(GroupId, Option[GroupId])] = List()
-      val targetSelectionOrder = igrs.values.toList.sortWith((a, b) => a.effectivePower > b.effectivePower || (a.effectivePower == b.effectivePower &&
+      val targetSelectionOrder = initialGroups.values.toList.sortWith((a, b) => a.effectivePower > b.effectivePower || (a.effectivePower == b.effectivePower &&
         a.initiative >= b.initiative))
       println(s"Target selection order:")
       targetSelectionOrder.foreach(println)
       for(attackingGroup <- targetSelectionOrder)
       {
-        val defendingGroup: Option[Group] = igrs.values.filter(pd => pd.id.side == attackingGroup.id.side.other)
-          .filterNot(pd => targets.flatMap(_._2).contains(pd.id)) // not defending yer
+        val defendingGroup: Option[Group] = initialGroups.values.filter(pd => pd.id.side == attackingGroup.id.side.other)
+          .filterNot(pd => targets.flatMap(_._2).contains(pd.id)) // not defending yet
           .filter(df => attackingGroup.attackPotential(df) > 0)
           .toList
           .sortWith((a, b) => {
@@ -134,26 +135,25 @@ object Main extends App {
                 (a.effectivePower > b.effectivePower || ( a.effectivePower == b.effectivePower && a.initiative >= b.initiative)))
           }).headOption
         targets = (attackingGroup.id -> defendingGroup.map(_.id)) :: targets
-//        println(s"Attacker ${attackingGroup.id} chose target: $defendingGroup")
       }
 
       // phase II: attacking
       println("Phase II - attacking")
       var newState: Map[GroupId, Group] = Map()
-      val attackOrder = igrs.values.toList.sortBy(_.initiative).map(_.id).reverse
+      val attackOrder = initialGroups.values.toList.sortBy(_.initiative).map(_.id).reverse
       var dead: List[GroupId] = List()
       for(attackingGroupId <- attackOrder)
       {
-        val attackingGroup: Group = newState.getOrElse(attackingGroupId, igrs(attackingGroupId))
+        val attackingGroup: Group = newState.getOrElse(attackingGroupId, initialGroups(attackingGroupId))
         val defender = targets.find(_._1 == attackingGroup.id).map(_._2).get
         defender match {
           case Some(defendingGroupId) =>
             if (dead.contains(attackingGroupId)) {
-              newState = newState.updated(defendingGroupId, igrs(defendingGroupId))
+              newState = newState.updated(defendingGroupId, initialGroups(defendingGroupId))
             }
             else {
               println(s"${attackingGroup.id} attacks $defendingGroupId")
-              val aa = igrs(defendingGroupId).afterAttackby(attackingGroup)
+              val aa = initialGroups(defendingGroupId).afterAttackby(attackingGroup)
               newState = aa match {
                 case Some(defendingGroupAfterDefense) => newState.updated(defendingGroupId, defendingGroupAfterDefense)
                 case _ =>
@@ -166,19 +166,19 @@ object Main extends App {
       }
 
       val targeted = targets.flatMap(_._2).toSet
-      val carry = igrs.filterKeys(!targeted.contains(_))
+      val carry = initialGroups.filterKeys(!targeted.contains(_))
       newState = newState ++ carry
       new State(newState)
     }
 
     def render() = {
-      val groupsBySide = igrs.values.groupBy(_.id.side)
+      val groupsBySide = initialGroups.values.groupBy(_.id.side)
       for ((side, groups) <- groupsBySide)
-        {
-          println(s"$side:")
-          groups.foreach(g => println(s"${g.id} contains ${g.numberOfUnits} units"))
-          println()
-        }
+      {
+        println(s"$side:")
+        groups.foreach(g => println(s"${g.id} contains ${g.numberOfUnits} units"))
+        println()
+      }
 
     }
   }
@@ -196,6 +196,6 @@ object Main extends App {
     state.render()
     round = round + 1
   }
-  val result = state.igrs.values.map(_.numberOfUnits).sum
+  val result = state.initialGroups.values.map(_.numberOfUnits).sum
   println(s"Winning army (${state.winningArmy}) has $result units")
 }
